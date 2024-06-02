@@ -2,23 +2,26 @@
 
 This is a Node.js application that provides an API for managing Nginx configuration.
 
-## Getting Started
-
-To run this application, follow these steps:
-
-1. Install Node.js and npm if you haven't already.
-2. Clone this repository.
-3. Navigate to the project directory.
-4. Install dependencies:
-    ```bash
-    npm install
-    ```
-5. Start the server:
-    ```bash
-    npm start
-    ```
-
 The server will start running on port 4000 by default.
+
+## Adding a New Nginx Configuration
+
+
+1. **POST Request**: User sends a POST request with plain text containing the new Nginx configuration.
+
+2. **File Creation**: API creates two configuration files in `sites-available` and `sites-enabled`.
+
+3. **Symbolic Link**: API creates a symbolic link between the files.
+
+4. **Nginx Reload**: Nginx is reloaded to apply the new configuration.
+
+5. **Response**: API responds with success or error messages.
+
+This summarizes the key steps involved in adding a new Nginx configuration via the API.
+
+
+![Screenshot from 2024-06-03 02-53-13](https://github.com/RafsanBinAli/demo-nginx/assets/154937557/fd35be2c-4362-41a5-84b6-da09983ef225)
+
 
 ## Endpoints
 
@@ -29,28 +32,36 @@ Returns the current Nginx configuration.
 ### POST /nginx
 
 Adds new configuration entries to the Nginx configuration.
-
 #### Request Body
 
-The request body should be a JSON object containing the new configuration entries.
-Example:
-```json
-{
-    "config": {
-        "sendfile": "on",
-        "tcp_nopush": "on",
-        "types_hash_max_size": "2048",
-        "ssl_protocols": "TLSv1 TLSv1.1 TLSv1.2 TLSv1.3",
-        "ssl_prefer_server_ciphers": "on",
-        "access_log": "/var/log/nginx/access.log",
-        "error_log": "/var/log/nginx/error.log",
-        "gzip": "on"
+The request body should be plain text containing the new configuration entries. Each configuration entry should be provided in the format:
+
+```nginx
+server {
+    listen 80;
+    listen [::]:80;
+
+    server_name example.com;
+
+    root /var/www/example.com;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ =404;
     }
 }
 ```
+
+
 ## Note
 
-The addition of configuration entries requires sudo privileges to modify the Nginx configuration files. Ensure that the files specified in the configuration paths have appropriate sudo privileges for writing.
+The addition of configuration entries requires sudo privileges to modify the Nginx configuration files. Ensure that the files specified in the configuration paths have appropriate sudo privileges for writing. 
+
+Or one can start this application by using 
+
+```bash
+sudo node app.js
+```
 
 ## Response
 
