@@ -1,8 +1,13 @@
 const fs = require('fs');
+const path = require('path');
 const { exec } = require('child_process');
 require('dotenv').config();
 
 const nginxConfigPath = process.env.nginxConfigPath;
+const sitesAvailablePath = process.env.SITES_AVAILABLE_PATH;
+const sitesEnabledPath = process.env.SITES_ENABLED_PATH;
+
+
 
 exports.getNginxConfig = (req, res) => {
     fs.readFile(nginxConfigPath, 'utf8', (err, data) => {
@@ -14,39 +19,51 @@ exports.getNginxConfig = (req, res) => {
     });
 };
 
+
+
+
+
 exports.addNginxConfig = (req, res) => {
-    const newConfig = req.body.config;
+    
+    let newConfigText = '';
 
-    if (!newConfig) {
-        return res.status(400).json({ error: 'New configuration is required' });
-    }
+    // Reading the request body as plain text
+    req.on('data', (chunk) => {
+        newConfigText += chunk.toString();
+    });
 
-    fs.readFile(nginxConfigPath, 'utf8', (err, data) => {
-        if (err) {
-            return res.status(500).json({ error: 'Failed to read Nginx configuration' });
+    req.on('end', () => {
+        if (!newConfigText) {
+            return res.status(400).json({ error: 'New configuration is required' });
         }
 
-        // Construct the new configuration string
-        const newConfigString = Object.entries(newConfig)
-            .map(([key, value]) => `${key} ${value};`)
-            .join('\n');
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const configFilename = `config-${timestamp}.conf`;
+        const configFilePath = path.join(sitesAvailablePath, configFilename);
+        const configFileEnablePath = path.join(sitesEnabledPath, configFilename);
 
-        // Append the new configuration to the existing configuration
-        const updatedConfig = `${data}\n\n${newConfigString}`;
-
-        // Write the updated configuration back to the file
-        fs.writeFile(nginxConfigPath, updatedConfig, 'utf8', (err) => {
+        // Write the configuration text to a file
+        fs.writeFile(configFilePath, newConfigText, 'utf8', (err) => {
             if (err) {
-                return res.status(500).json({ error: 'Failed to write Nginx configuration. You need Sudo Preveilage . To do that make the file writable' });
+                return res.status(500).json({ error: 'Failed to write Nginx configuration', details: err });
             }
 
-            // Reload Nginx to apply the new configuration
-            exec('nginx -s reload', (error, stdout, stderr) => {
-                if (error) {
-                    return res.status(500).json({ error: 'Failed to reload Nginx', details: stderr });
+            // Create a symbolic link in sites-enabled
+            fs.symlink(configFilePath, configFileEnablePath, (symlinkErr) => {
+                if (symlinkErr) {
+                    return res.status(500).json({ error: 'Failed to create symlink', details: symlinkErr });
                 }
-                res.json({ message: 'New Nginx configuration added and Nginx reloaded successfully', config: updatedConfig });
+
+                // Reload Nginx to apply the new configuration
+                exec('sudo nginx -s reload', (execErr, stdout, stderr) => {
+                    if (execErr) {
+                        return res.status(500).json({ error: 'Failed to reload Nginx', details: stderr });
+                    }
+                    res.json({ message: 'New Nginx configuration added and Nginx reloaded successfully', config: newConfigText });
+                });
             });
         });
     });
 };
+
+
